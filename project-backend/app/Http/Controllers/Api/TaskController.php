@@ -11,21 +11,33 @@ use Illuminate\Support\Facades\Validator;
 class TaskController extends Controller
 {
     // ១. បង្ហាញបញ្ជី Tasks ទាំងអស់ក្នុង Project ណាមួយ (Index)
-    public function index(Request $request, Project $project)
-    {
-        // ពិនិត្យសិទ្ធិម្ចាស់ Project
-        if ($project->user_id !== $request->user()->id){
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized access to this project.'
-            ], 403);
-        }
-
+   public function index(Request $request, Project $project)
+{
+    // ១. ពិនិត្យសិទ្ធិម្ចាស់ Project ជាមុនសិន
+    if ($project->user_id !== $request->user()->id) {
         return response()->json([
-            'success' => true,
-            'data' => $project->tasks
-        ], 200);
+            'success' => false,
+            'message' => 'Unauthorized access to this project.'
+        ], 403);
     }
+
+    // ២. ចាប់ផ្តើម Query លើ tasks របស់ project
+    $query = $project->tasks();
+
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('title', 'like', "%{$search}%")
+              ->orWhere('status', 'like', "%{$search}%");
+        });
+    }
+
+    // ៣. Return ទិន្នន័យដែលបាន Filter ពី $query
+    return response()->json([
+        'success' => true,
+        'data' => $query->latest()->paginate(10)
+    ], 200);
+}
 
     // ២. បង្កើត Task ថ្មីក្នុង Project (Store)
     public function store(Request $request, Project $project)

@@ -11,15 +11,27 @@ class ProjectController extends Controller
 {
     // ១. បង្ហាញបញ្ជី Project ទាំងអស់របស់ User ដែលកំពុង Login (Read - Index)
     public function index(Request $request)
-    {
-        // ប្រើ paginate(10) ដើម្បីកំណត់ឱ្យបង្ហាញត្រឹម 10 Projects ក្នុងមួយទំព័រ
-        $projects = $request->user()->projects()->with('tasks')->paginate(10);
+{
+    // ១. ចាប់ផ្តើម Query ពី projects របស់ user ដែលកំពុង login
+    $query = $request->user()->projects()->with('tasks');
 
-        return response()->json([
-            'success' => true,
-            'data' => $projects
-        ], 200);
+    // ២. Filter តាមពាក្យ search បើមានបញ្ជូនមក
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('name', 'like', "%{$search}%")
+              ->orWhere('description', 'like', "%{$search}%");
+        });
     }
+
+    // ៣. Execute $query ជាមួយ paginate(10)
+    $projects = $query->latest()->paginate(10);
+
+    return response()->json([
+        'success' => true,
+        'data' => $projects
+    ], 200);
+}
 
     // ២. បង្កើត Project ថ្មី (Create - Store)
     public function store(Request $request)
