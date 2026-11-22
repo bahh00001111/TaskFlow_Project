@@ -8,8 +8,10 @@ export default function ProjectDetails() {
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    // [ADDED] State សម្រាប់រក្សាពាក្យ Search របស់ Tasks
+    // [ADDED] State សម្រាប់ Search និង Filter ដាច់ដោយឡែកតាម Status និង Priority
     const [search, setSearch] = useState("");
+    const [statusFilter, setStatusFilter] = useState("");
+    const [priorityFilter, setPriorityFilter] = useState("");
 
     // Form State សម្រាប់ Add ឬ Edit Task
     const [task, setTask] = useState({
@@ -25,17 +27,16 @@ export default function ProjectDetails() {
 
     useEffect(() => {
         getProjectDetails();
-        getTasks();
     }, [id]);
 
-    // [ADDED] Live Search: រង់ចាំ 300ms បន្ទាប់ពីឈប់វាយអក្សរ ទើបហៅ API ស្វែងរក Tasks
+    // [UPDATED] ហៅ getTasks ឡើងវិញ ពេល search, statusFilter, priorityFilter ឬ id ផ្លាស់ប្តូរ (មាន debounce 300ms)
     useEffect(() => {
         const timer = setTimeout(() => {
-            getTasks(search);
+            getTasks(search, statusFilter, priorityFilter);
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [search, id]);
+    }, [search, statusFilter, priorityFilter, id]);
 
     const getProjectDetails = () => {
         axiosClient.get(`/projects/${id}`)
@@ -44,15 +45,21 @@ export default function ProjectDetails() {
             });
     };
 
-    // [UPDATED] កែ getTasks ឱ្យទទួល searchTerm និងបញ្ជូន params: { search } ទៅ API
-    const getTasks = (searchTerm = search) => {
+    // [UPDATED] បញ្ជូន params: { search, status, priority } ទៅកាន់ Backend API
+    const getTasks = (
+        searchTerm = search,
+        statusVal = statusFilter,
+        priorityVal = priorityFilter
+    ) => {
         setLoading(true);
         const trimmed = searchTerm.trim();
 
-        axiosClient.get(`/projects/${id}/tasks`, {
-            // បើមានពាក្យ search ទើបផ្ញើ query ?search=... ទៅ Backend
-            params: trimmed ? { search: trimmed } : {}
-        })
+        const params = {};
+        if (trimmed) params.search = trimmed;
+        if (statusVal) params.status = statusVal;
+        if (priorityVal) params.priority = priorityVal;
+
+        axiosClient.get(`/projects/${id}/tasks`, { params })
             .then(({ data }) => {
                 setLoading(false);
                 const rawTasks = data?.data?.data ?? data?.data ?? [];
@@ -63,19 +70,23 @@ export default function ProjectDetails() {
             });
     };
 
-    // [ADDED] Handler សម្រាប់ពេលចុចប៊ូតុង "Search" ឬចុច Enter ក្នុង search input
+    // [ADDED] Handler ពេលចុចប៊ូតុង "Search" ឬចុច Enter
     const handleSearchSubmit = (e) => {
         e.preventDefault();
-        getTasks(search);
+        getTasks(search, statusFilter, priorityFilter);
     };
 
-    // [ADDED] Handler សម្រាប់ប៊ូតុង "Clear" ដើម្បីលុបពាក្យ search និងបង្ហាញ tasks ទាំងអស់វិញ
-    const handleClearSearch = () => {
+    // [ADDED] Handler សម្រាប់ Clear / Reset ទាំង Search, Status និង Priority
+    const handleClearAll = () => {
         setSearch("");
-        getTasks("");
+        setStatusFilter("");
+        setPriorityFilter("");
+        getTasks("", "", "");
     };
 
-    // រៀបចំ Form ពេលចុចปุ่ม Edit Task
+    const hasActiveFilters = Boolean(search.trim() || statusFilter || priorityFilter);
+
+    // រៀបចំ Form ពេលចុចប៊ូតុង Edit Task
     const onEditClick = (t) => {
         setIsEditing(true);
         setTask(t);
@@ -102,12 +113,11 @@ export default function ProjectDetails() {
         setErrors(null);
 
         if (isEditing) {
-            // ហៅ API Update Task
             axiosClient.put(`/projects/${id}/tasks/${task.id}`, task)
                 .then(() => {
                     resetForm();
-                    // [UPDATED] រក្សា search term ដដែលក្រោយ Update Task
-                    getTasks(search);
+                    // [UPDATED] រក្សា filter បច្ចុប្បន្នក្រោយពេល Update
+                    getTasks(search, statusFilter, priorityFilter);
                 })
                 .catch((err) => {
                     if (err.response && err.response.status === 422) {
@@ -115,12 +125,11 @@ export default function ProjectDetails() {
                     }
                 });
         } else {
-            // ហៅ API Create Task
             axiosClient.post(`/projects/${id}/tasks`, task)
                 .then(() => {
                     resetForm();
-                    // [UPDATED] រក្សា search term ដដែលក្រោយ Add Task
-                    getTasks(search);
+                    // [UPDATED] រក្សា filter បច្ចុប្បន្នក្រោយពេល Create
+                    getTasks(search, statusFilter, priorityFilter);
                 })
                 .catch((err) => {
                     if (err.response && err.response.status === 422) {
@@ -136,8 +145,8 @@ export default function ProjectDetails() {
         }
         axiosClient.delete(`/projects/${id}/tasks/${taskId}`)
             .then(() => {
-                // [UPDATED] រក្សា search term ដដែលក្រោយ Delete Task
-                getTasks(search);
+                // [UPDATED] រក្សា filter បច្ចុប្បន្នក្រោយពេល Delete
+                getTasks(search, statusFilter, priorityFilter);
             });
     };
 
@@ -236,23 +245,61 @@ export default function ProjectDetails() {
 
             {/* បញ្ជី Tasks */}
             <div style={{ background: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                {/* [UPDATED] រៀបចំ Header ឱ្យមាន Title និង Search Form (Live Search + ប៊ូតុង Search/Clear) */}
+                {/* [UPDATED] Header មាន Title + Search Input + Status Dropdown + Priority Dropdown + Reset */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '10px' }}>
                     <h3 style={{ margin: 0 }}>Project Tasks</h3>
 
-                    <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '8px' }}>
+                    <form onSubmit={handleSearchSubmit} style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                        {/* Search Input */}
                         <input
                             type="text"
-                            placeholder="Search by title or status..."
+                            placeholder="Search title or description..."
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             style={{
                                 padding: '6px 12px',
                                 borderRadius: '4px',
                                 border: '1px solid #ccc',
-                                minWidth: '220px'
+                                minWidth: '200px'
                             }}
                         />
+
+                        {/* [ADDED] Dropdown Filter តាម Status */}
+                        <select
+                            value={statusFilter}
+                            onChange={e => setStatusFilter(e.target.value)}
+                            aria-label="Filter by Status"
+                            style={{
+                                padding: '6px 10px',
+                                borderRadius: '4px',
+                                border: '1px solid #ccc',
+                                background: 'white'
+                            }}
+                        >
+                            <option value="">All Statuses</option>
+                            <option value="To Do">To Do</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Completed">Completed</option>
+                        </select>
+
+                        {/* [ADDED] Dropdown Filter តាម Priority */}
+                        <select
+                            value={priorityFilter}
+                            onChange={e => setPriorityFilter(e.target.value)}
+                            aria-label="Filter by Priority"
+                            style={{
+                                padding: '6px 10px',
+                                borderRadius: '4px',
+                                border: '1px solid #ccc',
+                                background: 'white'
+                            }}
+                        >
+                            <option value="">All Priorities</option>
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                        </select>
+
                         <button
                             type="submit"
                             style={{
@@ -266,11 +313,12 @@ export default function ProjectDetails() {
                         >
                             Search
                         </button>
-                        {/* បង្ហាញប៊ូតុង Clear តែពេលមានពាក្យ search */}
-                        {search && (
+
+                        {/* [ADDED] ប៊ូតុង Clear / Reset បង្ហាញពេលមាន Filter ណាមួយកំពុងប្រើ */}
+                        {hasActiveFilters && (
                             <button
                                 type="button"
-                                onClick={handleClearSearch}
+                                onClick={handleClearAll}
                                 style={{
                                     padding: '6px 12px',
                                     background: '#e0e0e0',
@@ -280,7 +328,7 @@ export default function ProjectDetails() {
                                     cursor: 'pointer'
                                 }}
                             >
-                                Clear
+                                Reset
                             </button>
                         )}
                     </form>
@@ -306,7 +354,7 @@ export default function ProjectDetails() {
                                     <td colSpan="6" style={{ textAlign: 'center', padding: '20px' }}>No tasks found for this project.</td>
                                 </tr>
                             ) : (
-                                tasks.map(t => (
+                                (Array.isArray(tasks) ? tasks : []).map(t => (
                                     <tr key={t.id} style={{ borderBottom: '1px solid #eee' }}>
                                         <td style={{ padding: '10px' }}>{t.title}</td>
                                         <td style={{ padding: '10px' }}>{t.description}</td>

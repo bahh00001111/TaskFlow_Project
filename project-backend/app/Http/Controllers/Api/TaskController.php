@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Validator;
 class TaskController extends Controller
 {
     // ១. បង្ហាញបញ្ជី Tasks ទាំងអស់ក្នុង Project ណាមួយ (Index)
-   public function index(Request $request, Project $project)
+  public function index(Request $request, Project $project)
 {
     // ១. ពិនិត្យសិទ្ធិម្ចាស់ Project ជាមុនសិន
     if ($project->user_id !== $request->user()->id) {
@@ -24,18 +24,29 @@ class TaskController extends Controller
     // ២. ចាប់ផ្តើម Query លើ tasks របស់ project
     $query = $project->tasks();
 
+    // ស្វែងរកតាមពាក្យ search (លើ title និង description)
     if ($request->filled('search')) {
         $search = $request->search;
         $query->where(function ($q) use ($search) {
             $q->where('title', 'like', "%{$search}%")
-              ->orWhere('status', 'like', "%{$search}%");
+              ->orWhere('description', 'like', "%{$search}%");
         });
     }
 
-    // ៣. Return ទិន្នន័យដែលបាន Filter ពី $query
+    // Filter ដាច់ដោយឡែកតាម Status (ឧទាហរណ៍: To Do, In Progress, Completed)
+    if ($request->filled('status')) {
+        $query->where('status', $request->status);
+    }
+
+    // Filter ដាច់ដោយឡែកតាម Priority (ឧទាហរណ៍: Low, Medium, High)
+    if ($request->filled('priority')) {
+        $query->where('priority', $request->priority);
+    }
+
+    // ៣. Return ទិន្នន័យដែលបាន Filter
     return response()->json([
         'success' => true,
-        'data' => $query->latest()->paginate(10)
+        'data' => $query->latest()->get()
     ], 200);
 }
 
