@@ -22,5 +22,6 @@ return new class extends Migration
         $table->dropIndex(['role']);
         $table->dropColumn(['role', 'is_active']);
         });
-    }
+    } 
+    //hahahah
 };
