@@ -24,4 +24,14 @@ Route::middleware('auth:sanctum')->group(function(){
 
         // Task Nested CRUD Routes (Tasks ស្ថិតក្រោម Projects នីមួយៗ)
     Route::apiResource('projects.tasks', TaskController::class);
+
+        // Manager & Admin routes (សម្រាប់ Features បន្ទាប់ដូចជា Teams / Project Collaboration)
+    Route::middleware('role:manager, admin')->group(function (){
+
+    });
+
+        // Admin-only routes (សម្រាប់ Feature 2: Admin Dashboard & User Management)
+    Route::middleware('role:admin')->prefix('admin')->group(function (){
+        
+    }); 
 });

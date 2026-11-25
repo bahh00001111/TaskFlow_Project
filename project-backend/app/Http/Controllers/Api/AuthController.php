@@ -15,7 +15,8 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:6'
+            'password' => 'required|string|min:6',
+            
         ]);
 
         if ($validator->fails()){
@@ -29,6 +30,8 @@ class AuthController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password), 
+            'role' => 'member',
+            'is_active' => true,
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -64,6 +67,12 @@ class AuthController extends Controller
                 'success' => false,
                 'message' => 'Invalid email or password.'
             ], 401);
+        }
+        if (!$user->is_active){
+            return response()->json([
+                'success' => false,
+                'message' =>'Your account id deactivated. Please contact an administator.'
+            ], 403);
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
