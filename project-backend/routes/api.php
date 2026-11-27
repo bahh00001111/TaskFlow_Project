@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\AdminController;
 
 // Public Routes (មិនបាច់ Login ក៏អាចចូលបាន)
 Route::post('/register', [AuthController::class, 'register']);
@@ -32,6 +33,12 @@ Route::middleware('auth:sanctum')->group(function(){
 
         // Admin-only routes (សម្រាប់ Feature 2: Admin Dashboard & User Management)
     Route::middleware('role:admin')->prefix('admin')->group(function (){
+        Route::get('/stats', [AdminController::class,'stats']);
+        Route::get('/users', [AdminController::class, 'users']);
+        Route::get('/users/{user}', [AdminController::class, 'showUser']);
+        Route::patch('/users/{user}/role', [AdminController::class, 'updateRole']);
+        Route::patch('/users/{user}/status', [AdminController::class, 'updateStatus']);
+
         
     }); 
 });
